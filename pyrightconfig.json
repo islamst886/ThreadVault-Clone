@@ -1,0 +1,8 @@
+{
+  "extraPaths": [
+    "backend"
+  ],
+  "venvPath": ".",
+  "venv": "venv",
+  "typeCheckingMode": "off"
+}

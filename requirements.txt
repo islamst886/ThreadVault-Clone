@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+playwright
+httpx
+python-docx
+pydantic
+python-dotenv
+pytest
+pytest-asyncio
+google-genai

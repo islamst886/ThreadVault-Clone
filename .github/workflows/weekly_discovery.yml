@@ -1,0 +1,69 @@
+name: "📋 Weekly Discovery Reminder"
+
+on:
+  # This workflow is just a reminder — discovery 
+  # runs locally on your laptop, not on GitHub.
+  # See instructions below.
+  workflow_dispatch:
+
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Weekly Discovery Instructions
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "ThreadVault Weekly Community Discovery"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "The community discovery runs on YOUR LAPTOP"
+          echo "because GitHub Actions IPs are blocked by Reddit."
+          echo ""
+          echo "Run this every Sunday evening on your laptop:"
+          echo ""
+          echo "  python run_weekly_discovery.py"
+          echo ""
+          echo "Then commit and push:"
+          echo ""
+          echo "  git add data/community_database.json"
+          echo "  git add data/community_database_summary.txt"
+          echo '  git commit -m "Weekly community database update"'
+          echo "  git push"
+          echo ""
+          echo "The daily pipeline will automatically use the"
+          echo "updated database for the next 7 days."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      
+      - uses: actions/checkout@v4
+      
+      - name: Check database freshness
+        run: |
+          if [ -f "./data/community_database.json" ]; then
+            python -c "
+          import json
+          from datetime import datetime, timezone
+          with open('./data/community_database.json') as f:
+              d = json.load(f)
+          updated = d.get('last_updated', 'unknown')
+          count = len(d.get('communities', []))
+          print(f'Current database:')
+          print(f'  Communities: {count}')
+          print(f'  Last updated: {updated}')
+          try:
+              dt = datetime.fromisoformat(
+                  updated.replace('Z', '+00:00')
+              )
+              age = (datetime.now(timezone.utc) - dt).days
+              if age > 14:
+                  print(f'  ⚠  {age} days old — needs refresh!')
+                  print('  Run: python run_weekly_discovery.py')
+              elif age > 7:
+                  print(f'  ⚠  {age} days old — refresh recommended')
+              else:
+                  print(f'  ✅ {age} days old — fresh')
+          except:
+              pass
+            "
+          else
+            echo "❌ No database found — run discovery on laptop first"
+          fi

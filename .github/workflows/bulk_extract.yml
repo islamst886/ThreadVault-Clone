@@ -1,0 +1,319 @@
+name: Bulk Subreddit Extractor
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# TRIGGERS
+#   1) workflow_dispatch — "Run workflow" button in GitHub Actions UI
+#   2) schedule          — runs automatically on a cron timer (see below)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+on:
+
+  # ── TRIGGER 1: Manual run via GitHub Actions UI ───────────────────────────
+  workflow_dispatch:
+    inputs:
+
+      subreddits:
+        description: >
+          Subreddit names, comma-separated (no r/ prefix needed).
+          Example: personaltraining,fitness,entrepreneur
+        required: true
+        default: 'personaltraining,fitness'
+        type: string
+
+      post_limit:
+        description: >
+          Max posts to extract per subreddit
+          (100 = fast ~15 min | 500 = recommended ~1 hr | 1000 = thorough ~2 hrs)
+        required: true
+        default: '200'
+        type: choice
+        options:
+          - '100'
+          - '200'
+          - '500'
+          - '1000'
+
+      years_back:
+        description: >
+          How many years of posts to go back
+        required: true
+        default: '2'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '5'
+
+      comment_sort:
+        description: >
+          How to sort comments within each post
+        required: true
+        default: 'top'
+        type: choice
+        options:
+          - 'top'
+          - 'best'
+          - 'new'
+          - 'controversial'
+          - 'old'
+
+      comment_limit:
+        description: >
+          How many top-level comments to extract per post
+        required: true
+        default: '25'
+        type: choice
+        options:
+          - '10'
+          - '25'
+          - '50'
+          - '100'
+          - 'all'
+
+      fresh_run:
+        description: >
+          Force a fresh extraction (ignore previous run's progress)?
+          Set to "true" to re-extract everything from scratch.
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+  # ── TRIGGER 2: Automatic scheduled run ────────────────────────────────────
+  #
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # SCHEDULED RUN TIME — EDIT THIS TO CHANGE
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Format:  cron: "MINUTE HOUR * * DAY_OF_WEEK"
+  # All times are in UTC.
+  #
+  # Common examples:
+  #   "0 2  * * *"   = every day at 2:00 AM UTC
+  #   "0 20 * * *"   = every day at 8:00 PM UTC
+  #   "0 14 * * *"   = every day at 2:00 PM UTC
+  #   "0 2  * * 1"   = every Monday at 2:00 AM UTC
+  #   "0 2  * * 1,4" = every Monday and Thursday at 2:00 AM UTC
+  #
+  # UTC → local time conversion (add your UTC offset):
+  #   UTC+6 (Dhaka / Bangladesh):
+  #     To run at  8:00 AM Dhaka  →  "0  2 * * *"  (2 AM UTC  = 8 AM  +6)
+  #     To run at  2:00 PM Dhaka  →  "0  8 * * *"  (8 AM UTC  = 2 PM  +6)
+  #     To run at midnight Dhaka  →  "0 18 * * *"  (6 PM UTC  = midnight +6)
+  #   UTC+5:30 (India):
+  #     To run at  8:00 AM IST    →  "30 2 * * *"
+  #
+  # To disable scheduled runs entirely:
+  #   Comment out the entire "schedule:" block below.
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  schedule:
+    - cron: "0 2 * * *"   # Default: 8:00 AM Dhaka time (UTC+6)
+  #
+  # Settings for scheduled runs live in:
+  #   .github/workflows/scheduled_config.yml
+  # Edit that file to change what gets extracted automatically.
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# JOB
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+jobs:
+  extract:
+    name: Bulk Subreddit Extraction
+    runs-on: ubuntu-latest
+    timeout-minutes: 350   # ~5.8 hours — safely under GitHub's 6-hour limit
+
+    # Opt into Node.js 24 now to suppress the Node.js 20 deprecation warnings
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+
+      # ── Step 1: Checkout code ─────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Step 2: Set up Python 3.11 ────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      # ── Step 3: Install dependencies ──────────────────────────────────────
+      # NOTE: Do NOT install playwright here.
+      # The bulk extractor uses the Reddit JSON API via httpx only —
+      # no headless browser is needed.
+      # NOTE: asyncio is part of Python's standard library — do not pip-install it.
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx python-docx aiofiles pyyaml python-dotenv fastapi
+
+      # ── Step 4: Restore processed-URLs cache (incremental resume) ─────────
+      # This restores ./outputs/processed_state.json from a previous run so that
+      # subreddits already extracted are skipped today.
+      # On a fresh_run=true manual trigger, we skip the restore entirely.
+      - name: Restore extraction progress cache
+        if: ${{ github.event.inputs.fresh_run != 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ./outputs/processed_state.json
+          key: processed-state-${{ github.ref_name }}
+          restore-keys: |
+            processed-state-
+
+      # ── Step 5: Determine input source (manual vs scheduled) ──────────────
+      - name: Resolve run configuration
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "RUN_TYPE=manual" >> $GITHUB_ENV
+            echo "SUBREDDITS=${{ inputs.subreddits }}"       >> $GITHUB_ENV
+            echo "POST_LIMIT=${{ inputs.post_limit }}"       >> $GITHUB_ENV
+            echo "YEARS_BACK=${{ inputs.years_back }}"       >> $GITHUB_ENV
+            echo "COMMENT_SORT=${{ inputs.comment_sort }}"   >> $GITHUB_ENV
+            echo "COMMENT_LIMIT=${{ inputs.comment_limit }}" >> $GITHUB_ENV
+          else
+            echo "RUN_TYPE=scheduled" >> $GITHUB_ENV
+            python .github/workflows/read_config.py
+          fi
+
+      # ── Step 6: Verify backend imports are working ────────────────────────
+      # This step catches import errors early with a clear message instead of
+      # a silent 0-second success from the extraction step.
+      - name: Verify backend imports
+        run: |
+          python - <<'EOF'
+          import sys, os
+          from pathlib import Path
+          backend = Path(".").resolve() / "backend"
+          sys.path.insert(0, str(backend))
+          try:
+              import httpx
+              print("  httpx:", httpx.__version__)
+              import docx
+              print("  python-docx: OK")
+              import subreddit_bulk_extractor
+              print("  subreddit_bulk_extractor: OK")
+              from subreddit_bulk_extractor import bulk_extract_subreddits
+              print("  bulk_extract_subreddits: OK")
+              print()
+              print("All imports successful. Proceeding with extraction.")
+          except ImportError as e:
+              print(f"IMPORT ERROR: {e}")
+              sys.exit(1)
+          EOF
+
+      # ── Step 7: Print job summary ─────────────────────────────────────────
+      - name: Print job summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ThreadVault Bulk Extraction"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Run type:      $RUN_TYPE"
+          echo "  Subreddits:    $SUBREDDITS"
+          echo "  Post limit:    $POST_LIMIT per subreddit"
+          echo "  Years back:    $YEARS_BACK"
+          echo "  Comment sort:  $COMMENT_SORT"
+          echo "  Comment limit: $COMMENT_LIMIT per post"
+          echo "  Started at:    $(date -u '+%Y-%m-%d %H:%M UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if [ -f "./outputs/processed_state.json" ]; then
+            echo "  Resuming from previous run:"
+            echo "  Already processed: $(python -c "import json; print(', '.join([k for k,v in json.load(open('./outputs/processed_state.json')).items() if v.get('status')=='success']))" 2>/dev/null)"
+          else
+            echo "  No previous progress found — starting fresh."
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      # ── Step 7.5: Test Arctic Shift connectivity ───────────────────────────
+      - name: Test Arctic Shift connectivity
+        run: |
+          python - <<'EOF'
+          import httpx
+          import asyncio
+          
+          async def test():
+              headers = {
+                  "User-Agent": "ThreadVault/1.0 research tool github.com/Badrul886/ThreadVault",
+                  "Accept": "application/json"
+              }
+              url = "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=personaltraining&limit=1"
+              try:
+                  async with httpx.AsyncClient(headers=headers, timeout=15) as client:
+                      print(f"Testing connectivity to {url}...")
+                      r = await client.get(url)
+                      print(f"Status Code: {r.status_code}")
+                      if r.status_code == 200:
+                          data = r.json()
+                          posts = data.get("data", [])
+                          print(f"✅ OK. Retrieved {len(posts)} posts.")
+                          if posts:
+                              print(f"Snippet: {str(posts[0])[:150]}...")
+                      else:
+                          print("❌ FAILED to retrieve posts.")
+              except Exception as e:
+                  print(f"ERROR: {e}")
+          
+          asyncio.run(test())
+          EOF
+
+      # ── Step 8: Run the bulk extraction ───────────────────────────────────
+      - name: Run bulk extraction
+        env:
+          SUBREDDITS:    ${{ env.SUBREDDITS }}
+          POST_LIMIT:    ${{ env.POST_LIMIT }}
+          YEARS_BACK:    ${{ env.YEARS_BACK }}
+          COMMENT_SORT:  ${{ env.COMMENT_SORT }}
+          COMMENT_LIMIT: ${{ env.COMMENT_LIMIT }}
+        run: python .github/workflows/run_extraction.py
+
+      # ── Step 9: Save updated extraction progress to cache ─────────────────
+      # This runs even if the extraction step failed/timed out, so partial
+      # progress is preserved for the next scheduled run.
+      - name: Save extraction progress cache
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: ./outputs/processed_state.json
+          key: processed-state-${{ github.ref_name }}-${{ github.run_id }}
+
+      # ── Step 10: Upload DOCX files as downloadable artifacts ──────────────
+      - name: Upload DOCX artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threadvault-run${{ github.run_number }}-${{ github.run_id }}
+          path: ./outputs/*.docx
+          retention-days: 30
+          if-no-files-found: warn
+
+      # ── Step 11: Print completion summary ─────────────────────────────────
+      - name: Print completion summary
+        if: always()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  EXTRACTION COMPLETE"
+          echo "  Finished at: $(date -u '+%Y-%m-%d %H:%M UTC')"
+          echo ""
+          echo "  To download your DOCX files:"
+          echo "    1. Go to your GitHub repository"
+          echo "    2. Click the Actions tab"
+          echo "    3. Click this workflow run"
+          echo "    4. Scroll to the Artifacts section"
+          echo "    5. Click the artifact name to download"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          if ls ./outputs/*.docx 2>/dev/null | head -1; then
+            echo ""
+            echo "  Generated files:"
+            for f in ./outputs/*.docx; do
+              size=$(du -h "$f" | cut -f1)
+              echo "    $size  $(basename $f)"
+            done
+          else
+            echo "  No DOCX files found in ./outputs/"
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

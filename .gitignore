@@ -1,0 +1,33 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+
+# Output files
+output/
+outputs/
+
+# Playwright
+playwright/.local-browsers/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# ThreadVault community database - must be committed
+!data/community_database.json
+!data/community_database_summary.txt

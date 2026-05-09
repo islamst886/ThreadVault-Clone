@@ -1,0 +1,29 @@
+subreddits:
+  # Fitness & Health
+  - personaltraining
+  - fitness
+  - loseit
+  - bodybuilding
+  - running
+  # Business & Startup
+  - entrepreneur
+  - startups
+  - SideProject
+  - indiehackers
+  - smallbusiness
+  # Tech & SaaS
+  - SaaS
+  - webdev
+  - programming
+  - nocode
+  # High Signal Communities
+  - personalfinance
+  - digitalnomad
+  - freelance
+
+settings:
+  lookback_hours: 24        # analyze posts from last 24 hours
+  viral_score_threshold: 50 # upvotes needed to be "notable"
+  viral_ratio_threshold: 3  # 3x the subreddit average = viral
+  top_posts_per_sub: 10     # top N posts to analyze per sub
+  min_comments_for_viral: 5 # at least 5 comments to qualify

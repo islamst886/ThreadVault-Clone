@@ -1,0 +1,16 @@
+ThreadVault Community Database
+Generated: 2026-04-25 13:33 UTC
+Total communities: 10
+─────────────────────────────────────────────
+Rank  Subreddit              Members    Active  Score  Category
+─────────────────────────────────────────────
+1     r/Fitness              12,504,113 0       10     fitness_health
+2     r/Entrepreneur         5,154,305  0       10     business_startup
+3     r/SaaS                 670,351    0       10     tech_software
+4     r/webdev               3,233,154  0       10     tech_software
+5     r/personaltraining     86,845     0       10     other
+6     r/programming          6,869,920  0       10     tech_software
+7     r/marketing            1,931,123  0       10     business_startup
+8     r/investing            3,340,223  0       10     finance_money
+9     r/Cooking              6,100,534  0       10     lifestyle
+10    r/photography          5,594,758  0       10     creative_design

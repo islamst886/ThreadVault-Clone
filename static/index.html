@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThreadVault — Reddit Research Tool</title>
+    <meta name="description" content="Search Reddit via Google, explore communities, AI analysis, download DOCX.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=20260420g">
+</head>
+<body>
+<div class="app-shell">
+
+    <!-- HEADER -->
+    <header>
+        <div>
+            <div class="logo">Thread<span class="accent">Vault</span></div>
+            <div class="tagline">Reddit research · AI analysis · Community discovery</div>
+        </div>
+    </header>
+
+    <!-- TAB NAV -->
+    <nav class="tab-nav">
+        <button class="tab-btn active" id="tabBtnSearch"     onclick="switchTab('search')">🔎 Search Posts</button>
+        <button class="tab-btn"        id="tabBtnExplorer"   onclick="switchTab('explorer')">🔍 Community Explorer</button>
+        <button class="tab-btn"        id="tabBtnValidation" onclick="switchTab('validation')">🎯 Validation Hub</button>
+        <button class="tab-btn"        id="tabBtnBulk"       onclick="switchTab('bulk')">📦 Bulk Archive</button>
+        <button class="tab-btn"        id="tabBtnYoutube"    onclick="switchTab('youtube')">📹 YouTube Comments</button>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 1 — SEARCH POSTS
+    ═══════════════════════════════════════════════════════════════ -->
+    <div id="tabSearch" class="tab-panel active">
+
+        <div id="errorAlert"   class="alert alert-error"></div>
+        <div id="warningAlert" class="alert alert-warning"></div>
+        <div id="infoAlert"    class="alert alert-info" style="display:none"></div>
+
+        <!-- SEARCH SECTION -->
+        <div id="searchSection" class="section active">
+            <div class="card">
+                <form id="searchForm">
+                    <div class="form-group">
+                        <label for="query">Search keywords</label>
+                        <input type="text" id="query" placeholder="e.g. best mechanical keyboards 2024" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="maxPages">Max Google pages to scan</label>
+                        <input type="number" id="maxPages" value="30" min="1" max="1000" required>
+                    </div>
+                    <hr class="divider">
+                    <div class="section-heading">Comment Settings</div>
+                    <div class="form-group">
+                        <label for="sortInput">Sort comments by</label>
+                        <select id="sortInput">
+                            <option value="best" selected>Best</option>
+                            <option value="top">Top</option>
+                            <option value="new">New</option>
+                            <option value="controversial">Controversial</option>
+                            <option value="old">Old</option>
+                            <option value="qa">Q&amp;A</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="limitInput">Top-level comments per post</label>
+                        <select id="limitInput">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="all" selected>All (slower)</option>
+                        </select>
+                        <div id="limitWarning" class="limit-warning">⚠ "All comments" may produce a very large file on popular posts.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btnSubmit">Start Research</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- PROGRESS SECTION -->
+        <div id="progressSection" class="section">
+            <div class="card">
+                <div class="status-label" id="statusText">Initialising…</div>
+                <div class="progress-track"><div class="progress-fill" id="progressBar"></div></div>
+                <div class="log-box" id="logArea"></div>
+            </div>
+        </div>
+
+        <!-- RESULT SECTION -->
+        <div id="resultSection" class="section">
+            <div class="card">
+                <div class="result-hero">
+                    <div class="icon" id="resultIcon">✅</div>
+                    <h2 id="resultHeadline">Research Complete</h2>
+                    <p id="resultStats">Extracted 0 Reddit posts.</p>
+                </div>
+            </div>
+            <div id="dashboard">
+                <div class="card">
+                    <div class="dash-title">📊 Research Dashboard</div>
+                    <div class="dash-subtitle">AI-generated insights from all extracted posts</div>
+                    <div id="dashLoader" class="dash-loader">Loading insights…</div>
+                    <div id="dashContent" style="display:none">
+                        <div class="panel-grid wide" style="margin-bottom:16px">
+                            <div class="panel">
+                                <div class="panel-label">Panel 1 — Category Breakdown · click bar to filter posts ↓</div>
+                                <div class="chart-bars" id="chartBars"></div>
+                            </div>
+                        </div>
+                        <div class="panel-grid">
+                            <div class="panel"><div class="panel-label">Panel 2 — Pain Points Found</div><div class="scroll-list" id="painList"></div></div>
+                            <div class="panel"><div class="panel-label">Panel 3 — Products &amp; Competitors</div><div class="scroll-list" id="productList"></div></div>
+                        </div>
+                        <div class="panel-grid">
+                            <div class="panel panel-opportunity"><div class="panel-label">💡 Panel 4 — Potential Opportunities</div><div class="scroll-list" id="solutionList"></div></div>
+                            <div class="panel panel-wtp" id="wtpPanel"><div class="panel-label">Panel 5 — Willingness to Pay Signal</div><div id="wtpContent"></div></div>
+                        </div>
+                        <div class="panel-grid wide" style="margin-top:16px">
+                            <div class="panel">
+                                <div class="panel-label">Panel 6 — All Extracted Posts</div>
+                                <div class="post-list-header">
+                                    <div id="postCount" style="font-size:.81rem;color:var(--text-dim)"></div>
+                                    <div class="filter-pill-row" id="filterPills"></div>
+                                </div>
+                                <div class="post-cards" id="postCards"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <button id="btnDownload" class="btn btn-success" style="display:none">⬇ Download DOCX</button>
+                <button id="btnReset" class="btn btn-ghost">Start New Search</button>
+            </div>
+        </div>
+
+    </div><!-- /tabSearch -->
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 2 — COMMUNITY EXPLORER
+    ═══════════════════════════════════════════════════════════════ -->
+    <div id="tabExplorer" class="tab-panel">
+
+        <div id="explErrAlert" class="alert alert-error"></div>
+
+        <!-- Search + quick filters -->
+        <div class="card" style="padding:20px 22px 16px">
+            <div class="expl-search-row">
+                <input type="text" id="explorerQuery" placeholder="Search Reddit communities… (e.g. pets, fitness, saas)">
+                <button class="btn-expl-search" id="btnExplSearch">Search</button>
+            </div>
+            <div class="quick-filters">
+                <button class="qf-btn active" id="qfTrending" onclick="loadTrending()">🔥 Trending</button>
+                <button class="qf-btn"        id="qfNew"      onclick="loadGrowing()">📈 Growing</button>
+                <button class="qf-btn"        id="qfAll"      onclick="loadAll()">🌐 All Reddit</button>
+                <button class="qf-btn"        id="qfSearch"   onclick="runSearch()">🔎 Search Results</button>
+            </div>
+            <!-- Growing tab disclaimer banner -->
+            <div id="growingDisclaimer" class="growing-disclaimer" style="display:none">
+                <span>ⓘ Growth figures are estimated from each community's lifetime member average and current activity levels. For exact daily tracking, communities need to be monitored over time.</span>
+                <button class="growing-dismiss" onclick="document.getElementById('growingDisclaimer').style.display='none'" aria-label="Dismiss">✕</button>
+            </div>
+        </div>
+
+        <!-- Controls + view toggle -->
+        <div class="card" style="padding:14px 20px">
+            <div class="ctrl-bar">
+                <select id="ctrlSort" onchange="sortLocally()">
+                    <optgroup label="—— Standard ——">
+                        <option value="members">📊 Sort: Members (largest first)</option>
+                        <option value="active">🟢 Sort: Most Active Right Now</option>
+                        <option value="ratio">📈 Sort: Engagement %</option>
+                        <option value="growth">🚀 Sort: Growth Score</option>
+                        <option value="newest">📅 Sort: Newest Communities</option>
+                        <option value="alpha">🔤 Sort: Alphabetical</option>
+                    </optgroup>
+                    <optgroup label="—— Growing Tab ——">
+                        <option value="momentum">⚡ Sort: Momentum Score (default for Growing)</option>
+                        <option value="est_monthly">📈 Sort: Est. Monthly Growth</option>
+                        <option value="per1k">👥 Sort: Active Per 1,000 Members</option>
+                        <option value="engagement_pct">💯 Sort: Engagement %</option>
+                    </optgroup>
+                </select>
+                <select id="ctrlSize" onchange="onFilterChange()">
+                    <option value="">📦 All Sizes</option>
+                    <option value="1m">1M+ Members</option>
+                    <option value="100k">100k – 1M</option>
+                    <option value="10k">10k – 100k</option>
+                    <option value="1k">1k – 10k</option>
+                    <option value="100">100 – 1k</option>
+                    <option value="tiny">Under 100 Members</option>
+                </select>
+                <select id="ctrlActivity" onchange="onFilterChange()">
+                    <option value="">⚡ Any Activity</option>
+                    <option value="hot">🔥 Very Active (10k+ online)</option>
+                    <option value="high">🟢 High (1k–10k online)</option>
+                    <option value="active">💬 Active (100–1k online)</option>
+                    <option value="slow">🐢 Slow (10–100 online)</option>
+                    <option value="quiet">😴 Quiet (&lt;10 online)</option>
+                </select>
+                <div class="view-toggle">
+                    <button class="view-btn active" id="viewList" onclick="setView('list')" title="List view">☰</button>
+                    <button class="view-btn"        id="viewCard" onclick="setView('card')" title="Card view">⊞</button>
+                </div>
+            </div>
+            <!-- Growing tab: timeframe toggle bar -->
+            <div id="growingSortBar" class="growing-sort-bar" style="display:none">
+                <span class="growing-sort-label">⏱ Timeframe emphasis:</span>
+                <button class="tf-btn" data-tf="weekly"  onclick="setGrowingTimeframe('weekly')">∼ Weekly</button>
+                <button class="tf-btn active" data-tf="monthly" onclick="setGrowingTimeframe('monthly')">∼ Monthly</button>
+                <button class="tf-btn" data-tf="yearly"  onclick="setGrowingTimeframe('yearly')">∼ Yearly</button>
+            </div>
+            <div class="expl-progress" id="explProgress">
+                <div class="expl-prog-track"><div class="expl-prog-fill" id="explProgFill"></div></div>
+                <div class="expl-prog-label" id="explProgLabel">Loading…</div>
+            </div>
+            <div class="expl-count" id="explCount"></div>
+            <!-- Warning shown when filters may be hiding communities outside the loaded set -->
+            <div id="filterNote" class="filter-note" style="display:none"></div>
+        </div>
+
+
+        <!-- Skeleton -->
+        <div id="explSkeleton" style="display:none">
+            <div class="skel-list">
+                <div class="skel-row"><div class="skel-line w-50"></div><div class="skel-line w-70"></div><div class="skel-line w-30"></div></div>
+                <div class="skel-row"><div class="skel-line w-50"></div><div class="skel-line w-70"></div><div class="skel-line w-30"></div></div>
+                <div class="skel-row"><div class="skel-line w-50"></div><div class="skel-line w-70"></div><div class="skel-line w-30"></div></div>
+            </div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="explEmpty" style="display:none" class="expl-msg">
+            <div class="msg-icon">🔍</div>
+            <div id="explEmptyText">No communities found.</div>
+        </div>
+
+        <!-- Results (Load More button is inserted by JS below this div) -->
+        <div id="explResults">
+            <div id="communityList" class="community-list"></div>
+            <div id="communityGrid" class="community-grid" style="display:none"></div>
+        </div>
+
+        <!-- Comparison table -->
+        <div id="compareSection">
+            <div class="card" style="margin-top:20px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+                    <div style="font-size:1rem;font-weight:800">Community Comparison</div>
+                    <button class="btn-sm btn-sm-outline" onclick="clearComparison()">✕ Clear</button>
+                </div>
+                <div class="compare-table-wrap"><table class="compare-table" id="compareTable"></table></div>
+            </div>
+        </div>
+
+    </div><!-- /tabExplorer -->
+
+    <!-- ════════════════════════════════════════════════════════
+         TAB 3 — VALIDATION HUB
+         ═══════════════════════════════════════════════════════ -->
+    <div id="tabValidation" class="tab-panel">
+
+        <!-- ─── Validation Profile Switcher ─────────────────────────────── -->
+        <div class="vh-profile-bar">
+            <span class="vh-profile-label">Validating for:</span>
+            <div class="vh-profile-select-wrap">
+                <select id="vhProfileSelect" onchange="vhSwitchProfile(this.value)"></select>
+            </div>
+            <button class="btn-sm btn-sm-outline" id="vhNewProjectBtn" onclick="vhNewProfile()">+ New Project</button>
+            <button class="btn-sm btn-sm-outline" id="vhRenameProfileBtn" onclick="vhRenameProfile()" title="Rename">✏️</button>
+            <button class="btn-sm btn-sm-outline" id="vhDeleteProfileBtn" onclick="vhDeleteProfile()" title="Delete project" style="color:#fca5a5">🗑</button>
+        </div>
+
+        <!-- Sub-tab nav -->
+        <div class="vh-sub-nav">
+            <button class="vh-tab-btn active" id="vhTabFindLeads"   onclick="vhSwitchTab('findLeads')">🔍 Find Leads</button>
+            <button class="vh-tab-btn"        id="vhTabMessageBuilder" onclick="vhSwitchTab('messageBuilder')">✉️ Message Builder</button>
+            <button class="vh-tab-btn"        id="vhTabPipeline"    onclick="vhSwitchTab('pipeline')">📋 Pipeline</button>
+        </div>
+
+        <!-- ════════ SUB-TAB 1: FIND LEADS ════════ -->
+        <div id="vhFindLeads" class="vh-panel">
+            <div class="vh-find-layout">
+
+                <!-- LEFT: Validation Profile Form -->
+                <div class="vh-form-col card">
+                    <div class="vh-form-title">🎯 Validation Profile</div>
+                    <div class="vh-form-subtitle">Describe your SaaS and we'll find Reddit users actively discussing those problems.</div>
+
+                    <div class="form-group">
+                        <label for="vhSaasDesc">What does your SaaS do?</label>
+                        <input type="text" id="vhSaasDesc" placeholder="e.g. Scheduling and client management for personal trainers" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="vhTargetCustomer">Who is your target customer?</label>
+                        <input type="text" id="vhTargetCustomer" placeholder="e.g. Independent personal trainers" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="vhProblems">What problems does it solve?</label>
+                        <textarea id="vhProblems" rows="5" placeholder="One problem per line, e.g.:
+Managing client bookings manually
+Sending invoices and payment reminders
+Tracking client workout progress
+Admin overhead eating into training time"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="vhSubreddits">Target subreddits <span class="label-optional">(optional)</span></label>
+                        <input type="text" id="vhSubreddits" placeholder="r/personaltraining, r/fitness, r/entrepreneur">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Search depth</label>
+                        <div class="vh-depth-group">
+                            <label class="vh-radio-label">
+                                <input type="radio" name="vhDepth" value="quick"> Quick
+                                <span class="vh-depth-hint">~3 pages · 30 posts</span>
+                            </label>
+                            <label class="vh-radio-label">
+                                <input type="radio" name="vhDepth" value="standard" checked> Standard
+                                <span class="vh-depth-hint">~10 pages · 100 posts</span>
+                            </label>
+                            <label class="vh-radio-label">
+                                <input type="radio" name="vhDepth" value="deep"> Deep
+                                <span class="vh-depth-hint">~20 pages · 200 posts</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary vh-find-btn" id="vhFindBtn" onclick="vhStartFindLeads()">🔍 Find Leads</button>
+
+                    <!-- Progress section (hidden until running) -->
+                    <div id="vhProgress" class="vh-progress" style="display:none">
+                        <div class="vh-prog-bar-wrap"><div class="vh-prog-bar" id="vhProgBar"></div></div>
+                        <div class="vh-prog-label" id="vhProgLabel">Initialising…</div>
+                        <div class="vh-prog-sub" id="vhProgSub"></div>
+                    </div>
+                    <div id="vhError" class="alert alert-err" style="display:none"></div>
+                </div>
+
+                <!-- RIGHT: Lead Results -->
+                <div class="vh-results-col">
+
+                    <!-- Summary bar -->
+                    <div class="vh-summary" id="vhSummary" style="display:none">
+                        <span id="vhSummaryText">Found 0 leads</span>
+                        <div class="vh-filter-btns">
+                            <button class="vhf-btn active" data-filter="all"    onclick="vhApplyFilter('all')">All</button>
+                            <button class="vhf-btn"        data-filter="high"   onclick="vhApplyFilter('high')">🔴 High Priority</button>
+                            <button class="vhf-btn"        data-filter="solution" onclick="vhApplyFilter('solution')">🎯 Solution Seekers</button>
+                            <button class="vhf-btn"        data-filter="money"  onclick="vhApplyFilter('money')">💰 Money Talk</button>
+                            <button class="vhf-btn"        data-filter="pain"   onclick="vhApplyFilter('pain')">😤 Pain Points</button>
+                        </div>
+                    </div>
+                    <!-- Batch generate button (shown after leads load) -->
+                    <div id="vhBatchBar" class="vh-batch-bar" style="display:none">
+                        <button class="btn-sm btn-sm-orange" id="vhBatchBtn" onclick="vhGenerateAllMessages()">
+                            🚀 Generate Messages for All High Priority Leads
+                        </button>
+                        <div id="vhBatchStatus" class="vh-batch-status"></div>
+                    </div>
+
+
+                    <div id="vhLeadList" class="vh-lead-list">
+                        <div class="vh-empty-state" id="vhEmptyState">
+                            <div class="vh-empty-icon">🎯</div>
+                            <div class="vh-empty-text">Fill in your validation profile and click <strong>Find Leads</strong> to discover warm prospects on Reddit.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ════════ SUB-TAB 2: MESSAGE BUILDER ════════ -->
+        <div id="vhMessageBuilder" class="vh-panel" style="display:none">
+            <!-- Empty state (shown before a lead is selected) -->
+            <div id="vhMsgEmpty" class="card" style="padding:40px; text-align:center; max-width:600px; margin:40px auto">
+                <div style="font-size:2.5rem; margin-bottom:16px">✉️</div>
+                <div style="font-size:1.2rem; font-weight:700; margin-bottom:10px">Message Builder</div>
+                <div style="color:var(--text-muted)">Select a lead from the <strong>Find Leads</strong> tab and click <strong>Build Message</strong> to generate a personalised AI outreach message.</div>
+            </div>
+
+            <!-- Active message builder (shown when a lead is loaded) -->
+            <div id="vhMsgBuilder" style="display:none">
+
+                <!-- Lead context header -->
+                <div class="card vmb-context-card">
+                    <div class="vmb-back-row">
+                        <button class="btn-sm btn-sm-outline" onclick="vhSwitchTab('findLeads')">← Back to Leads</button>
+                        <div class="vmb-lead-name" id="vmbLeadName">u/username</div>
+                        <div class="vmb-lead-sub" id="vmbLeadSub">r/subreddit</div>
+                    </div>
+                    <div class="vmb-quote-box">
+                        <div class="vmb-quote-label">📌 What they said:</div>
+                        <div class="vmb-quote-text" id="vmbQuoteText"></div>
+                    </div>
+                    <div class="vmb-pain" id="vmbPain"></div>
+                </div>
+
+                <!-- Loading spinner -->
+                <div id="vmbLoading" class="vmb-loading" style="display:none">
+                    <div class="vmb-spinner"></div>
+                    <div class="vmb-loading-text">Asking Gemini to personalize 3 message versions in parallel…</div>
+                </div>
+
+                <!-- Message versions (3 tabs) -->
+                <div id="vmbVersions" style="display:none">
+                    <div class="vmb-version-nav">
+                        <button class="vmb-ver-btn active" id="vmbVerA" onclick="vmbShowVersion(0)">Version A: Direct</button>
+                        <button class="vmb-ver-btn"        id="vmbVerB" onclick="vmbShowVersion(1)">Version B: Curious</button>
+                        <button class="vmb-ver-btn"        id="vmbVerC" onclick="vmbShowVersion(2)">Version C: Story-led</button>
+                        <button class="btn-sm btn-sm-outline vmb-regen-btn" id="vmbRegenBtn" onclick="vmbRegenerate()">🔄 Regenerate All</button>
+                    </div>
+
+                    <div class="card vmb-msg-card">
+                        <!-- Subject line -->
+                        <div class="vmb-subject-row">
+                            <span class="vmb-subject-label">Subject:</span>
+                            <span class="vmb-subject-text" id="vmbSubject"></span>
+                        </div>
+
+                        <!-- Editable message textarea -->
+                        <textarea id="vmbMessageText" class="vmb-textarea" rows="8" oninput="vmbUpdateCount()"></textarea>
+
+                        <!-- Footer row -->
+                        <div class="vmb-footer-row">
+                            <span class="vmb-char-count" id="vmbCharCount">0 chars</span>
+                            <span class="vmb-read-time" id="vmbReadTime"></span>
+                        </div>
+
+                        <!-- Personalization note -->
+                        <div class="vmb-note" id="vmbNote"></div>
+
+                        <!-- Validation question highlight -->
+                        <div class="vmb-validation-q" id="vmbValQ"></div>
+
+                        <!-- Action buttons -->
+                        <div class="vmb-actions">
+                            <button class="btn-sm btn-sm-orange" onclick="vmbCopy()">📋 Copy Message</button>
+                            <button class="btn-sm btn-sm-outline" onclick="vmbMarkSent()">✅ Mark as Sent → Pipeline</button>
+                        </div>
+                    </div>
+
+                    <!-- Outreach tips -->
+                    <div class="vmb-tips-card card">
+                        <div class="vmb-tips-title">⚠️ Outreach Tips</div>
+                        <ul class="vmb-tips-list">
+                            <li>Do <strong>NOT</strong> send more than <strong>15 DMs/day</strong> — Reddit flags accounts that do</li>
+                            <li>Wait <strong>3 days</strong> before following up on unanswered messages</li>
+                            <li>Like their post <strong>before</strong> sending a DM — it warms the interaction</li>
+                            <li>Vary your opener every time — this tool does this automatically</li>
+                            <li>Use a <strong>personal Reddit account</strong>, not a brand account</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Error state -->
+                <div id="vmbError" class="alert alert-err" style="display:none"></div>
+
+            </div><!-- /vhMsgBuilder -->
+        </div><!-- /vhMessageBuilder -->
+
+        <!-- ════════ SUB-TAB 3: PIPELINE ════════ -->
+        <div id="vhPipeline" class="vh-panel" style="display:none">
+
+            <!-- Follow-up due banner -->
+            <div id="vhFollowBanner" class="vh-followup-banner" style="display:none" onclick="vhScrollToFollowup()">
+                <span id="vhFollowBannerText">⏰ Leads due for follow-up today</span>
+                <span class="vh-follow-arrow">→ View</span>
+            </div>
+
+            <!-- Analytics panel -->
+            <div class="card vh-analytics-card">
+                <div class="vh-analytics-title">📊 Pipeline Analytics</div>
+                <div class="vh-analytics-stats" id="vhAnalyticsStats">
+                    <div class="vh-stat-box" id="vhStatTotal">
+                        <div class="vh-stat-num" id="vhStatTotalN">0</div>
+                        <div class="vh-stat-lbl">Total Leads</div>
+                    </div>
+                    <div class="vh-stat-box" id="vhStatContacted">
+                        <div class="vh-stat-num" id="vhStatContactedN">0</div>
+                        <div class="vh-stat-lbl">Contacted</div>
+                    </div>
+                    <div class="vh-stat-box" id="vhStatReplied">
+                        <div class="vh-stat-num" id="vhStatRepliedN">0</div>
+                        <div class="vh-stat-lbl">Replied</div>
+                    </div>
+                    <div class="vh-stat-box" id="vhStatValidated">
+                        <div class="vh-stat-num" id="vhStatValidatedN">0</div>
+                        <div class="vh-stat-lbl">Validated</div>
+                    </div>
+                    <div class="vh-stat-box" id="vhStatRate">
+                        <div class="vh-stat-num" id="vhStatRateN">—</div>
+                        <div class="vh-stat-lbl">Reply Rate</div>
+                    </div>
+                </div>
+                <!-- Funnel -->
+                <div class="vh-funnel" id="vhFunnel"></div>
+                <div class="vh-benchmark" id="vhBenchmark"></div>
+            </div>
+
+            <!-- Top action bar -->
+            <div class="vh-pipeline-topbar">
+                <div class="vh-pipe-title">📋 Lead Pipeline</div>
+                <button class="btn-sm btn-sm-outline" onclick="vhExportPipeline()">📥 Export as DOCX</button>
+            </div>
+
+            <!-- Kanban board -->
+            <div class="vh-kanban" id="vhKanban">
+                <div class="vh-kanban-col" id="pipeCol-new">
+                    <div class="vh-col-header">
+                        <span class="vh-col-icon">📋</span>
+                        <span class="vh-col-name">New Leads</span>
+                        <span class="vh-col-count" id="pipeCount-new">0</span>
+                    </div>
+                    <div class="vh-col-body" id="pipeBody-new"></div>
+                </div>
+                <div class="vh-kanban-col" id="pipeCol-contacted">
+                    <div class="vh-col-header">
+                        <span class="vh-col-icon">✉️</span>
+                        <span class="vh-col-name">Contacted</span>
+                        <span class="vh-col-count" id="pipeCount-contacted">0</span>
+                    </div>
+                    <div class="vh-col-body" id="pipeBody-contacted"></div>
+                </div>
+                <div class="vh-kanban-col vh-col-followup" id="pipeCol-followup">
+                    <div class="vh-col-header">
+                        <span class="vh-col-icon">👁️</span>
+                        <span class="vh-col-name">Follow-up Due</span>
+                        <span class="vh-col-count" id="pipeCount-followup">0</span>
+                    </div>
+                    <div class="vh-col-body" id="pipeBody-followup"></div>
+                </div>
+                <div class="vh-kanban-col" id="pipeCol-replied">
+                    <div class="vh-col-header">
+                        <span class="vh-col-icon">💬</span>
+                        <span class="vh-col-name">Replied</span>
+                        <span class="vh-col-count" id="pipeCount-replied">0</span>
+                    </div>
+                    <div class="vh-col-body" id="pipeBody-replied"></div>
+                </div>
+                <div class="vh-kanban-col vh-col-validated" id="pipeCol-validated">
+                    <div class="vh-col-header">
+                        <span class="vh-col-icon">✅</span>
+                        <span class="vh-col-name">Validated</span>
+                        <span class="vh-col-count" id="pipeCount-validated">0</span>
+                    </div>
+                    <div class="vh-col-body" id="pipeBody-validated"></div>
+                </div>
+                <div class="vh-kanban-col vh-col-rejected" id="pipeCol-rejected">
+                    <div class="vh-col-header">
+                        <span class="vh-col-icon">❌</span>
+                        <span class="vh-col-name">Not Interested</span>
+                        <span class="vh-col-count" id="pipeCount-rejected">0</span>
+                    </div>
+                    <div class="vh-col-body" id="pipeBody-rejected"></div>
+                </div>
+            </div>
+
+        </div><!-- /vhPipeline -->
+
+    </div><!-- /tabValidation -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 4 — BULK ARCHIVE
+    ═══════════════════════════════════════════════════════════════ -->
+    <div id="tabBulk" class="tab-panel">
+
+        <div id="baAlert" class="alert alert-error"></div>
+
+        <!-- ── SECTION 1+2+3: Input, Settings, Start ─────────────────── -->
+        <div class="card" id="baInputCard">
+
+            <div class="section-heading">📦 Subreddit Bulk Archiver</div>
+            <p class="ba-desc">Archive all posts from multiple subreddits over a chosen time period into structured, searchable DOCX files — automatically split for easy opening in Word.</p>
+
+            <!-- Tag pills input -->
+            <label class="ba-label">Subreddits to archive</label>
+            <div class="ba-tag-wrap" id="baTagWrap" onclick="document.getElementById('baTagField').focus()">
+                <div id="baTags"></div>
+                <input type="text" id="baTagField" class="ba-tag-field" placeholder="Type a subreddit name and press Enter…" maxlength="50" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ba-counter" id="baCounter">0 / 20 subreddits</div>
+
+            <!-- Paste helper -->
+            <details class="ba-paste-details">
+                <summary class="ba-paste-summary">Or paste multiple, comma-separated</summary>
+                <div class="ba-paste-row">
+                    <textarea id="baPasteArea" class="ba-paste-textarea" placeholder="personaltraining, fitness, entrepreneur, …"></textarea>
+                    <button class="btn btn-ghost ba-parse-btn" onclick="baParsePaste()">Parse &amp; Add</button>
+                </div>
+            </details>
+
+            <!-- Settings -->
+            <details class="ba-settings-wrap" id="baSettingsDetails">
+                <summary>⚙️ Settings</summary>
+                <div class="ba-settings-body">
+
+                    <div class="ba-setting-group">
+                        <div class="ba-setting-label">Time range</div>
+                        <div class="ba-radio-group">
+                            <label><input type="radio" name="baYears" value="0.5"> Past 6 months</label>
+                            <label><input type="radio" name="baYears" value="2" checked> Past 2 years</label>
+                            <label><input type="radio" name="baYears" value="3"> Past 3 years</label>
+                            <label><input type="radio" name="baYears" value="5"> Past 5 years</label>
+                        </div>
+                    </div>
+
+                    <div class="ba-setting-group">
+                        <div class="ba-setting-label">Posts per subreddit (safety limit)</div>
+                        <div class="ba-radio-group">
+                            <label><input type="radio" name="baLimit" value="100"> 100 posts <span class="ba-hint">(fast, ~15 min per sub)</span></label>
+                            <label><input type="radio" name="baLimit" value="500" checked> 500 posts <span class="ba-hint">(recommended, ~60 min per sub)</span></label>
+                            <label><input type="radio" name="baLimit" value="1000"> 1,000 posts <span class="ba-hint">(thorough, ~2 hrs per sub)</span></label>
+                        </div>
+                    </div>
+
+                    <div class="ba-settings-row">
+                        <div class="ba-setting-group half">
+                            <div class="ba-setting-label">Comment sort</div>
+                            <select id="baSort" class="ba-select">
+                                <option value="top" selected>Top</option>
+                                <option value="best">Best</option>
+                                <option value="new">New</option>
+                                <option value="controversial">Controversial</option>
+                                <option value="old">Old</option>
+                                <option value="qa">Q&amp;A</option>
+                            </select>
+                        </div>
+                        <div class="ba-setting-group half">
+                            <div class="ba-setting-label">Comments per post</div>
+                            <select id="baCommentLimit" class="ba-select" onchange="baUpdateEta()">
+                                <option value="10">10</option>
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="all">All (slower)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                </div>
+            </details>
+
+            <!-- ETA estimate -->
+            <div id="baEtaBar" class="ba-eta-bar">⏱ Add subreddits above to see time estimate.</div>
+
+            <!-- Start button -->
+            <button class="btn btn-primary ba-start-btn" id="baStartBtn" onclick="baConfirmStart()">📦 Start Bulk Archive</button>
+
+        </div><!-- /baInputCard -->
+
+        <!-- ── SECTION 4: Live Progress ───────────────────────────────── -->
+        <div class="card" id="baProgressCard" style="display:none">
+
+            <div class="ba-prog-header">
+                <div class="ba-prog-title">📦 Bulk Archive in Progress</div>
+                <button class="btn-sm btn-sm-outline" onclick="document.getElementById('baProgressCard').style.display='none'">✕ Hide</button>
+            </div>
+
+            <div class="ba-overall-stats">
+                <span id="baTotalPosts">0 / 0 posts extracted</span>
+                <span class="ba-dot">·</span>
+                <span id="baTotalComments">0 comments</span>
+                <span class="ba-dot">·</span>
+                <span id="baEtaRemaining">Calculating…</span>
+            </div>
+
+            <div class="progress-track ba-main-bar">
+                <div class="progress-fill" id="baMainFill" style="width:0%"></div>
+            </div>
+            <div class="ba-percent" id="baPercent">0%</div>
+
+            <!-- Per-subreddit progress rows -->
+            <div id="baSubRows" class="ba-sub-rows"></div>
+
+            <!-- Live log -->
+            <div class="ba-log-label">Live log</div>
+            <div class="log-box ba-log-box" id="baLogBox"></div>
+
+        </div><!-- /baProgressCard -->
+
+        <!-- ── SECTION 5: Download Results ────────────────────────────── -->
+        <div class="card" id="baDownloadsCard" style="display:none">
+
+            <div class="ba-done-header">
+                <div class="ba-done-icon">✅</div>
+                <div>
+                    <div class="ba-done-title">Archive Complete!</div>
+                    <div class="ba-done-stats" id="baDoneStats"></div>
+                </div>
+            </div>
+
+            <div id="baSkippedWarn" class="ba-skipped-warn" style="display:none"></div>
+            <div id="baFileList" class="ba-file-list"></div>
+
+            <div class="ba-tip">💡 Files are split at 200 posts each to keep them openable in Microsoft Word.</div>
+            <button class="btn btn-ghost ba-restart-btn" onclick="baRestart()">📦 Archive More Subreddits</button>
+
+        </div><!-- /baDownloadsCard -->
+
+    </div><!-- /tabBulk -->
+
+
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB 5 — YOUTUBE COMMENT ARCHIVER
+    ═══════════════════════════════════════════════════════════════ -->
+    <div id="tabYoutube" class="tab-panel" style="display:none">
+
+        <div id="ytAlert" class="alert alert-error"></div>
+
+        <!-- ── SECTION 1: Input ───────────────────────────────────────────── -->
+        <div class="card" id="ytInputCard">
+
+            <div class="section-heading">📹 YouTube Comment Archiver</div>
+            <p class="ba-desc">Enter YouTube channel names — the tool will fetch each channel's top 25 most-viewed videos and export all their top comments (with replies) to a DOCX file.</p>
+
+            <!-- Channel tag input -->
+            <label class="ba-label">YouTube channels to archive</label>
+            <div class="ba-tag-wrap" id="ytTagWrap" onclick="document.getElementById('ytTagField').focus()">
+                <div id="ytTags"></div>
+                <input type="text" id="ytTagField" class="ba-tag-field"
+                    placeholder="Channel name, @handle, or YouTube URL — press Enter to add…"
+                    maxlength="100" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ba-counter" id="ytCounter">0 / 20 channels</div>
+
+            <!-- Paste helper -->
+            <details class="ba-paste-details">
+                <summary class="ba-paste-summary">Or paste multiple, comma-separated</summary>
+                <div class="ba-paste-row">
+                    <textarea id="ytPasteArea" class="ba-paste-textarea" placeholder="MrBeast, @PewDiePie, Veritasium, …"></textarea>
+                    <button class="btn btn-ghost ba-parse-btn" onclick="ytParsePaste()">Parse &amp; Add</button>
+                </div>
+            </details>
+
+            <!-- Settings -->
+            <details class="ba-settings-wrap">
+                <summary>⚙️ Settings</summary>
+                <div class="ba-settings-body">
+
+                    <div class="ba-settings-row">
+                        <div class="ba-setting-group half">
+                            <div class="ba-setting-label">Top videos per channel</div>
+                            <select id="ytMaxVideos" class="ba-select">
+                                <option value="10">10 videos</option>
+                                <option value="25" selected>25 videos (recommended)</option>
+                                <option value="50">50 videos</option>
+                            </select>
+                        </div>
+                        <div class="ba-setting-group half">
+                            <div class="ba-setting-label">Comments per video</div>
+                            <select id="ytCommentLimit" class="ba-select">
+                                <option value="100">100 comments</option>
+                                <option value="300">300 comments</option>
+                                <option value="500">500 comments</option>
+                                <option value="all" selected>All comments (default)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="ba-setting-group" style="margin-top:10px">
+                        <div class="ba-setting-label" style="color:var(--text-dim);font-size:.85rem">
+                            💡 "All comments" exports every available top-level comment + all nested replies, sorted by YouTube's relevance algorithm (most helpful/liked first).
+                        </div>
+                    </div>
+
+                </div>
+            </details>
+
+            <div class="ba-eta-bar" style="color:#f59e0b">
+                ⚠ A YouTube Data API key (<code>YOUTUBE_API_KEY</code>) is required in your <code>.env</code> file. Free quota: 10,000 units/day.
+            </div>
+
+            <button class="btn btn-primary ba-start-btn yt-start-btn" id="ytStartBtn" onclick="ytStartJob()">📹 Start YouTube Archive</button>
+
+        </div><!-- /ytInputCard -->
+
+        <!-- ── SECTION 2: Progress ────────────────────────────────────────── -->
+        <div class="card" id="ytProgressCard" style="display:none">
+
+            <div class="ba-prog-header">
+                <div class="ba-prog-title">📹 YouTube Archive in Progress</div>
+            </div>
+
+            <div class="ba-overall-stats">
+                <span id="ytProgLabel">Initialising…</span>
+            </div>
+
+            <div class="progress-track ba-main-bar">
+                <div class="progress-fill yt-progress-fill" id="ytProgFill" style="width:0%"></div>
+            </div>
+
+            <div class="ba-sub-rows" style="margin-top:12px">
+                <div id="ytProgSub" style="font-size:.85rem;color:var(--text-dim);min-height:20px"></div>
+            </div>
+
+            <div class="ba-log-label">Live log</div>
+            <div class="log-box ba-log-box" id="ytLogBox"></div>
+
+        </div><!-- /ytProgressCard -->
+
+        <!-- ── SECTION 3: Download ────────────────────────────────────────── -->
+        <div class="card" id="ytDownloadCard" style="display:none">
+
+            <div class="ba-done-header">
+                <div class="ba-done-icon">✅</div>
+                <div>
+                    <div class="ba-done-title">Archive Complete!</div>
+                    <div class="ba-done-stats" id="ytDoneStats"></div>
+                </div>
+            </div>
+
+            <button class="btn btn-success" id="ytDownloadBtn" style="margin:16px 0">⬇ Download DOCX</button>
+
+            <div class="ba-tip">💡 The DOCX contains a cover page, channel metadata, per-video stats with clickable links, and all comments with nested replies.</div>
+            <button class="btn btn-ghost ba-restart-btn" onclick="ytRestart()">📹 Archive More Channels</button>
+
+        </div><!-- /ytDownloadCard -->
+
+    </div><!-- /tabYoutube -->
+
+</div><!-- /app-shell -->
+
+<!-- Custom leave-confirmation modal -->
+<div id="leaveModalOverlay" class="modal-overlay" style="display:none" aria-modal="true" role="dialog">
+    <div class="modal-box">
+        <div class="modal-icon">📎</div>
+        <div class="modal-title">Download before leaving?</div>
+        <div class="modal-body">You haven't downloaded your DOCX report yet. If you leave now, the file will still be available until the server restarts, but you may lose track of it.</div>
+        <div class="modal-actions">
+            <button class="btn btn-success" id="modalDownloadBtn">⬇ Download Now</button>
+            <button class="btn btn-ghost" id="modalLeaveBtn">Leave anyway</button>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Archive — Start Confirmation Modal -->
+<div id="baConfirmModal" class="modal-overlay" style="display:none" aria-modal="true" role="dialog">
+    <div class="ba-confirm-modal">
+        <div class="ba-confirm-title">📦 Confirm Bulk Archive</div>
+        <div id="baConfirmBody"></div>
+        <div class="ba-confirm-actions">
+            <button class="btn btn-ghost" onclick="baCloseConfirm()">Cancel</button>
+            <button class="btn btn-primary" onclick="baStartJob()">Start Archiving</button>
+        </div>
+    </div>
+</div>
+
+<!-- Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    <div id="drawerContent"></div>
+</div>
+
+<!-- Custom Modal for Validation Profiles -->
+<div id="vhModal" class="vh-modal-overlay" style="display:none">
+    <div class="card vh-modal-card">
+        <h3 id="vhModalTitle" class="vh-modal-title"></h3>
+        <input type="text" id="vhModalInput" class="vh-modal-input" style="display:none" />
+        <div class="vh-modal-actions">
+            <button class="btn-sm btn-sm-outline" id="vhModalCancelBtn">Cancel</button>
+            <button class="btn-sm btn-sm-orange" id="vhModalOkBtn">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Compare bar -->
+<div id="compareBar">
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="compareNames"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn-compare-clear" onclick="clearComparison()">Clear</button>
+        <button class="btn-compare-go" id="btnCompareGo">Compare (<span id="compareCount">0</span>)</button>
+    </div>
+</div>
+
+<!-- search.js must load first — it sets window._tv utilities used by explorer.js -->
+<script src="/static/search.js?v=20260420f"></script>
+<script src="/static/explorer.js?v=20260420f"></script>
+<script src="/static/validation.js?v=20260420f"></script>
+<script src="/static/bulk.js?v=20260422a"></script>
+<script src="/static/youtube.js?v=20260508a"></script>
+</body>
+</html>

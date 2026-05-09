@@ -1,0 +1,35 @@
+def build_json_url(post_url: str, sort: str, limit: int | str) -> str:
+    """
+    Converts a Reddit post URL into its public JSON API equivalent.
+    """
+    from urllib.parse import urlparse, urlunparse, urlencode
+    
+    parsed = urlparse(post_url)
+    path = parsed.path
+    if path.endswith("/"):
+        path = path[:-1]
+    
+    # Ensure it ends with .json
+    if not path.lower().endswith(".json"):
+        path += ".json"
+        
+    # Reconstruct the base URL without query params/fragment
+    clean_base = urlunparse((parsed.scheme, parsed.netloc, path, "", "", ""))
+    
+    # Build query parameters
+    params = {}
+    
+    # Built-in Reddit API mappings
+    # Many API docs list 'confidence' as the internal name for 'Best'
+    api_sort = "confidence" if sort.lower() == "best" else sort.lower()
+    params["sort"] = api_sort
+    
+    # Limit (Reddit max is 500 per request)
+    if str(limit).lower() == "all":
+        params["limit"] = 500
+    else:
+        params["limit"] = limit
+        
+    query_str = urlencode(params)
+    final_url = f"{clean_base}?{query_str}"
+    return final_url

@@ -1,0 +1,252 @@
+name: Intelligence — Tier 1 (10K-100K)
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # 6:00 AM Dhaka time daily
+  workflow_dispatch:
+    inputs:
+      lookback_hours:
+        description: "Hours to look back (default 24)"
+        default: "24"
+        type: choice
+        options: ["12", "24", "48"]
+      viral_threshold:
+        description: "Viral score threshold (default 3)"
+        default: "3"
+        type: choice
+        options: ["2", "3", "5", "10"]
+      test_mode:
+        description: >
+          Run in test mode (fast, 3-5 minutes).
+          Uses only 3 subreddits, skips AI analysis,
+          but tests all other pipeline components.
+          Use this to verify the workflow works.
+        type: boolean
+        default: false
+      test_with_ai:
+        description: >
+          Only used when test_mode is true.
+          Set to true to also test AI analysis 
+          (uses ~$0.01 of API credits).
+        type: boolean
+        default: false
+
+env:
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+
+    steps:
+      - name: Verify API key
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "⚠️ GEMINI_API_KEY secret not set! AI analysis will be skipped."
+            echo "To enable AI analysis, go to: Settings → Secrets and variables → Actions → New repository secret"
+            echo "Name: GEMINI_API_KEY"
+          else
+            echo "✅ API key present"
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify community database exists
+        run: |
+          if [ -f "./data/db_tier1_10k_100k.json" ]; then
+            SIZE=$(du -h ./data/db_tier1_10k_100k.json | cut -f1)
+            COUNT=$(python -c "
+          import json
+          with open('./data/db_tier1_10k_100k.json') as f:
+              d = json.load(f)
+          communities = d.get('communities', [])
+          updated = d.get('last_updated', 'unknown')
+          print(f'{len(communities)} communities | updated: {updated}')
+            " 2>/dev/null || echo "parse error")
+            echo "✅ Community database found: $SIZE — $COUNT"
+          else
+            echo "❌ CRITICAL: data/db_tier1_10k_100k.json not found"
+            echo ""
+            echo "The daily pipeline requires a community database."
+            echo "To fix this:"
+            echo "  1. On your laptop: python run_weekly_discovery.py"
+            echo "  2. git add data/db_tier1_10k_100k.json"
+            echo "  3. git commit -m 'Add community database'"
+            echo "  4. git push"
+            exit 1
+          fi
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx python-docx pyyaml aiofiles google-genai
+
+      - name: Restore post_tracking database
+        uses: actions/cache/restore@v4
+        with:
+          path: ./outputs/post_tracking_tier1.json
+          key: post-tracking-tier1-${{ github.run_id }}
+          restore-keys: post-tracking-tier1-
+
+      - name: Verify Arctic Shift connectivity
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "https://arctic-shift.photon-reddit.com/api/posts/search?limit=1")
+          if [ "$status" -eq 200 ]; then
+            echo "✅ Arctic Shift reachable"
+          else
+            echo "❌ Arctic Shift unreachable (HTTP $status)"
+            exit 1
+          fi
+
+      - name: Run intelligence pipeline
+        env:
+          LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '24' }}
+          VIRAL_THRESHOLD: ${{ github.event.inputs.viral_threshold || '3' }}
+          TEST_MODE: ${{ github.event.inputs.test_mode || 'false' }}
+          TEST_WITH_AI: ${{ github.event.inputs.test_with_ai || 'false' }}
+          DB_PATH: ./data/db_tier1_10k_100k.json
+          TRACKING_PATH: ./outputs/post_tracking_tier1.json
+          TIER_NAME: Tier1
+        run: python .github/workflows/run_daily_intel.py
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "DailyIntel-Tier1-${{ github.run_id }}"
+          path: ./outputs/ThreadVault_DailyIntel_*.docx
+          retention-days: 90
+
+      - name: Upload pipeline health stats
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "PipelineStats-Tier1-${{ github.run_id }}"
+          path: ./outputs/pipeline_stats_tier1.json
+          retention-days: 90
+
+      - name: Save post_tracking database to cache
+        # ⚠️ SKIP in test mode — never let test data overwrite production tracking
+        if: ${{ github.event.inputs.test_mode != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ./outputs/post_tracking_tier1.json
+          key: post-tracking-tier1-${{ github.run_id }}
+
+      - name: Print summary with key stats
+        run: |
+          python - << 'PYEOF'
+          import json, os, sys
+          from datetime import datetime, timezone
+
+          stats_file = "./outputs/pipeline_stats_tier1.json"
+          summary_file = os.environ.get("GITHUB_STEP_SUMMARY", "")
+
+          if not os.path.exists(stats_file):
+              print("pipeline_stats_tier1.json not found — pipeline may have failed before completion")
+              sys.exit(0)
+
+          with open(stats_file) as f:
+              s = json.load(f)
+
+          lines = []
+          mode_emoji = "🧪" if s.get("mode") == "TEST" else "🚀"
+          lines.append(f"## {mode_emoji} Daily Intelligence Pipeline — {s.get('mode', '?')} Run")
+          lines.append(f"> Run date: `{s.get('run_date', 'unknown')}`")
+          lines.append("")
+
+          # Main stats table
+          lines.append("| Metric | Value |")
+          lines.append("|---|---|")
+          lines.append(f"| 🏘️ Communities in database | {s.get('communities_in_db', 0):,} |")
+          lines.append(f"| 📌 Posts currently tracked | {s.get('posts_tracked', 0):,} |")
+          lines.append(f"| 📥 New posts ingested today | {s.get('new_posts_ingested', 0):,} |")
+          lines.append(f"| 🎯 Viral candidates found | {s.get('candidates_found', 0)} |")
+          lines.append(f"| 📉 Posts that peaked today | {s.get('peaked_today', 0)} |")
+          lines.append(f"| 🤖 AI analysis | {s.get('ai_analysis', '?')} |")
+          lines.append(f"| 📄 Report file | `{s.get('report_file', 'unknown')}` |")
+          lines.append(f"| 📦 Report size | {s.get('report_size_kb', 0)} KB |")
+          lines.append(f"| ⏱️ Pass A (intake) | {s.get('pass_a_seconds', 0)}s |")
+          lines.append(f"| ⏱️ Pass B (velocity) | {s.get('pass_b_seconds', 0)}s |")
+          lines.append("")
+
+          # Priority breakdown
+          pb = s.get("priority_breakdown", {})
+          if pb:
+              lines.append("### 🔥 Viral Candidate Breakdown")
+              lines.append("| Priority | Count |")
+              lines.append("|---|---|")
+              for pri in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+                  if pri in pb:
+                      emoji = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🟢"}.get(pri, "")
+                      lines.append(f"| {emoji} {pri} | {pb[pri]} |")
+              lines.append("")
+
+          output = "\n".join(lines)
+          print(output)
+
+          if summary_file:
+              with open(summary_file, "a") as sf:
+                  sf.write(output + "\n")
+          PYEOF
+
+      - name: Verify outputs
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "VERIFICATION CHECKLIST"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          # Check community database
+          if [ -f "./data/db_tier1_10k_100k.json" ]; then
+            SIZE=$(du -h ./data/db_tier1_10k_100k.json | cut -f1)
+            COUNT=$(python -c "
+          import json
+          with open('./data/db_tier1_10k_100k.json') as f:
+              d = json.load(f)
+          print(len(d.get('communities', [])))
+            " 2>/dev/null || echo "parse error")
+            echo "✅ community_database.json exists"
+            echo "   Size: $SIZE | Communities: $COUNT"
+          else
+            echo "❌ community_database.json MISSING"
+          fi
+          
+          # Check post tracking database
+          if [ -f "./outputs/post_tracking_tier1.json" ]; then
+            SIZE=$(du -h ./outputs/post_tracking_tier1.json | cut -f1)
+            echo "✅ post_tracking_tier1.json exists — $SIZE"
+          else
+            echo "⚠  post_tracking_tier1.json not found"
+            echo "   (Normal on first run — created by daily pipeline)"
+          fi
+          
+          # Check DOCX report
+          DOCX_COUNT=$(ls ./outputs/*.docx 2>/dev/null | wc -l || echo 0)
+          if [ "$DOCX_COUNT" -gt "0" ]; then
+            echo "✅ DOCX report(s) generated: $DOCX_COUNT file(s)"
+            for f in ./outputs/*.docx; do
+              SIZE=$(du -h "$f" | cut -f1)
+              echo "   📄 $SIZE  $(basename $f)"
+            done
+          else
+            echo "❌ No DOCX files found in ./outputs/"
+          fi
+          
+          echo ""
+          # Final verdict
+          if [ -f "./data/db_tier1_10k_100k.json" ] && \
+             [ "$DOCX_COUNT" -gt "0" ]; then
+            echo "✅✅✅ ALL CHECKS PASSED — Pipeline working"
+          else
+            echo "❌ SOME CHECKS FAILED — See above"
+            exit 1
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -1,0 +1,29 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ThreadVault — Scheduled Extraction Config
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# This file controls what gets extracted on AUTOMATIC (scheduled) runs.
+# Manual runs (via the "Run workflow" button in GitHub Actions) use the
+# values you type into the form instead — this file is ignored for those.
+#
+# HOW TO EDIT:
+#   Change the values below and commit the file.
+#   The next scheduled run will automatically pick up your changes.
+#
+# FIELDS:
+#   subreddits   – comma-separated names, no "r/" prefix required
+#   post_limit   – max posts per subreddit (100 / 200 / 500 / 1000)
+#   years_back   – how many years of history to extract (1 / 2 / 3 / 5)
+#   comment_sort – how to sort comments: top / best / new / controversial / old
+#   comment_limit– top-level comments per post (10 / 25 / 50 / 100)
+#
+# To change the schedule TIME, edit the cron expression in:
+#   .github/workflows/bulk_extract.yml  (search for "cron:")
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+config:
+  subreddits:    "personaltraining,fitness,entrepreneur"
+  post_limit:    "200"
+  years_back:    "2"
+  comment_sort:  "top"
+  comment_limit: "25"
