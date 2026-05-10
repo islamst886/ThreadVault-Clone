@@ -2,7 +2,7 @@ name: Intelligence — Tier 1 (10K-100K)
 
 on:
   schedule:
-    - cron: "0 0 * * *"  # 6:00 AM Dhaka time daily
+    - cron: "45 21 * * *"  # 3:45 AM Dhaka time daily
   workflow_dispatch:
     inputs:
       lookback_hours:
